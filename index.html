@@ -249,7 +249,9 @@
     <div class="container">
         <header>
             <h1>Registro de Horarios</h1>
-            <p id="fechaActual"></p>
+            <div class="input-group" style="margin-top: 10px; max-width: 300px; margin-left: auto; margin-right: auto;">
+                <input type="date" id="fechaInput" style="text-align: center;">
+            </div>
         </header>
         
         <div class="controls">
@@ -327,24 +329,44 @@
     </div>
 
     <script>
-        let registros = [];
+        let todosLosRegistros = {};
+        let fechaSeleccionada = '';
         let filaSeleccionada = null;
         let indexAEliminar = null;
 
+        function obtenerFechaActual() {
+            const ahora = new Date();
+            const offset = ahora.getTimezoneOffset() * 60000;
+            const fechaLocal = new Date(ahora.getTime() - offset);
+            return fechaLocal.toISOString().split('T')[0];
+        }
+
         function guardarDatos() {
-            localStorage.setItem('registrosHorarios', JSON.stringify(registros));
+            localStorage.setItem('registrosHorarios', JSON.stringify(todosLosRegistros));
         }
 
         function cargarDatos() {
             const datos = localStorage.getItem('registrosHorarios');
             if (datos) {
-                registros = JSON.parse(datos);
+                todosLosRegistros = JSON.parse(datos);
             }
         }
 
+        function cambiarFecha() {
+            fechaSeleccionada = document.getElementById('fechaInput').value;
+            if (!todosLosRegistros[fechaSeleccionada]) {
+                todosLosRegistros[fechaSeleccionada] = [];
+            }
+            filaSeleccionada = null;
+            renderizarTabla();
+        }
+
         function mostrarFecha() {
-            const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' };
-            document.getElementById('fechaActual').textContent = new Date().toLocaleDateString('es-ES', opciones);
+            fechaSeleccionada = obtenerFechaActual();
+            document.getElementById('fechaInput').value = fechaSeleccionada;
+            if (!todosLosRegistros[fechaSeleccionada]) {
+                todosLosRegistros[fechaSeleccionada] = [];
+            }
         }
 
         function generarOpcionesHorario() {
@@ -409,7 +431,7 @@
                 horarioSalida: ''
             };
 
-            registros.push(nuevoRegistro);
+            todosLosRegistros[fechaSeleccionada].push(nuevoRegistro);
             nombreInput.value = '';
             apellidoInput.value = '';
             horarioSelect.value = '';
@@ -423,7 +445,7 @@
                 return;
             }
 
-            registros[filaSeleccionada].horarioLlegada = obtenerHoraActual();
+            todosLosRegistros[fechaSeleccionada][filaSeleccionada].horarioLlegada = obtenerHoraActual();
             renderizarTabla();
             mostrarToast('Llegada registrada');
         }
@@ -434,7 +456,7 @@
                 return;
             }
 
-            registros[filaSeleccionada].horarioSalida = obtenerHoraActual();
+            todosLosRegistros[fechaSeleccionada][filaSeleccionada].horarioSalida = obtenerHoraActual();
             renderizarTabla();
             mostrarToast('Salida registrada');
         }
@@ -456,7 +478,7 @@
 
         function confirmarEliminacion() {
             if (indexAEliminar !== null) {
-                registros.splice(indexAEliminar, 1);
+                todosLosRegistros[fechaSeleccionada].splice(indexAEliminar, 1);
                 if (filaSeleccionada === indexAEliminar) {
                     filaSeleccionada = null;
                 } else if (filaSeleccionada > indexAEliminar) {
@@ -472,6 +494,7 @@
             guardarDatos();
             const tbody = document.getElementById('tbody');
             const emptyState = document.getElementById('emptyState');
+            const registros = todosLosRegistros[fechaSeleccionada] || [];
 
             if (registros.length === 0) {
                 tbody.innerHTML = '';
@@ -498,14 +521,15 @@
         }
 
         function descargarExcel() {
+            const registros = todosLosRegistros[fechaSeleccionada] || [];
             if (registros.length === 0) {
                 mostrarToast('No hay datos para descargar', 'error');
                 return;
             }
 
-            const fecha = new Date().toLocaleDateString('es-ES', { timeZone: 'America/Argentina/Buenos_Aires' }).replace(/\//g, '-');
+            const fecha = fechaSeleccionada;
             const datos = [
-                ['Registro de Horarios - ' + new Date().toLocaleDateString('es-ES', { timeZone: 'America/Argentina/Buenos_Aires' })],
+                ['Registro de Horarios - ' + fecha],
                 [],
                 ['Nombre', 'Apellido', 'Horario Citado', 'Horario Llegada', 'Horario Salida'],
                 ...registros.map(r => [r.nombre, r.apellido, r.horarioCitato, r.horarioLlegada, r.horarioSalida])
@@ -528,6 +552,8 @@
         document.getElementById('apellidoInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') agregarPersona();
         });
+
+        document.getElementById('fechaInput').addEventListener('change', cambiarFecha);
 
         cargarDatos();
         mostrarFecha();
