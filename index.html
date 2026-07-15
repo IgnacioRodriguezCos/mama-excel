@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Horarios</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        header {
+            background: #4472C4;
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        header h1 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+        header p {
+            opacity: 0.9;
+            font-size: 0.95em;
+        }
+        .controls {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            flex: 1;
+            min-width: 250px;
+        }
+        .input-group input, .input-group select {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: #4472C4;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn-llegada {
+            background: #70AD47;
+            color: white;
+        }
+        .btn-salida {
+            background: #ED7D31;
+            color: white;
+        }
+        .btn-descargar {
+            background: #4472C4;
+            color: white;
+        }
+        .btn-nombre {
+            background: #5B9BD5;
+            color: white;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .input-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+        .table-container {
+            padding: 20px;
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background: #4472C4;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-size: 1em;
+        }
+        td {
+            padding: 12px 15px;
+            text-align: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        tr:nth-child(even) {
+            background: #f5f5f5;
+        }
+        tr:hover {
+            background: #e3f2fd;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+        footer {
+            padding: 15px;
+            text-align: center;
+            background: #f8f9fa;
+            color: #666;
+            font-size: 0.85em;
+        }
+        .selected-row {
+            background: #fff3cd !important;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast.success {
+            background: #70AD47;
+        }
+        .toast.error {
+            background: #ED7D31;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Registro de Horarios</h1>
+            <p id="fechaActual"></p>
+        </header>
+        
+        <div class="controls">
+            <div class="input-row">
+                <div class="input-group">
+                    <input type="text" id="nombreInput" placeholder="Nombre de la persona">
+                </div>
+                <div class="input-group">
+                    <select id="horarioCitadoSelect">
+                        <option value="">Horario citado</option>
+                    </select>
+                </div>
+                <button class="btn btn-nombre" onclick="agregarPersona()">Agregar</button>
+            </div>
+            
+            <div class="actions">
+                <button class="btn btn-llegada" onclick="registrarLlegada()">Registrar Llegada</button>
+                <button class="btn btn-salida" onclick="registrarSalida()">Registrar Salida</button>
+                <button class="btn btn-descargar" onclick="descargarExcel()">Descargar Excel</button>
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <table id="tablaRegistros">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Horario Citado</th>
+                        <th>Horario Llegada</th>
+                        <th>Horario Salida</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody">
+                </tbody>
+            </table>
+            <div class="empty-state" id="emptyState">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <p>No hay registros aún.<br>Agrega una persona para comenzar.</p>
+            </div>
+        </div>
+        
+        <footer>
+            Selecciona una fila para registrar llegada/salida
+        </footer>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let registros = [];
+        let filaSeleccionada = null;
+
+        function mostrarFecha() {
+            const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' };
+            document.getElementById('fechaActual').textContent = new Date().toLocaleDateString('es-ES', opciones);
+        }
+
+        function generarOpcionesHorario() {
+            const select = document.getElementById('horarioCitadoSelect');
+            for (let h = 7; h <= 20; h++) {
+                for (let m = 0; m < 60; m += 15) {
+                    const hora = String(h).padStart(2, '0');
+                    const minuto = String(m).padStart(2, '0');
+                    const option = document.createElement('option');
+                    option.value = `${hora}:${minuto}`;
+                    option.textContent = `${hora}:${minuto}`;
+                    select.appendChild(option);
+                }
+            }
+        }
+
+        function obtenerHoraActual() {
+            const ahora = new Date();
+            const opciones = { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', hour12: false };
+            return ahora.toLocaleTimeString('es-ES', opciones);
+        }
+
+        function mostrarToast(mensaje, tipo = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = mensaje;
+            toast.className = `toast ${tipo} show`;
+            setTimeout(() => toast.className = 'toast', 3000);
+        }
+
+        function agregarPersona() {
+            const nombreInput = document.getElementById('nombreInput');
+            const horarioSelect = document.getElementById('horarioCitadoSelect');
+            const nombre = nombreInput.value.trim();
+            const horarioCitato = horarioSelect.value;
+            
+            if (!nombre) {
+                mostrarToast('Ingresa un nombre', 'error');
+                nombreInput.focus();
+                return;
+            }
+
+            const nuevoRegistro = {
+                id: Date.now(),
+                nombre: nombre,
+                horarioCitato: horarioCitato,
+                horarioLlegada: '',
+                horarioSalida: ''
+            };
+
+            registros.push(nuevoRegistro);
+            nombreInput.value = '';
+            horarioSelect.value = '';
+            renderizarTabla();
+            mostrarToast(`${nombre} agregado correctamente`);
+        }
+
+        function registrarLlegada() {
+            if (filaSeleccionada === null) {
+                mostrarToast('Selecciona una fila primero', 'error');
+                return;
+            }
+
+            registros[filaSeleccionada].horarioLlegada = obtenerHoraActual();
+            renderizarTabla();
+            mostrarToast('Llegada registrada');
+        }
+
+        function registrarSalida() {
+            if (filaSeleccionada === null) {
+                mostrarToast('Selecciona una fila primero', 'error');
+                return;
+            }
+
+            registros[filaSeleccionada].horarioSalida = obtenerHoraActual();
+            renderizarTabla();
+            mostrarToast('Salida registrada');
+        }
+
+        function seleccionarFila(index) {
+            filaSeleccionada = index;
+            renderizarTabla();
+        }
+
+        function eliminarRegistro(index) {
+            if (confirm('¿Eliminar este registro?')) {
+                registros.splice(index, 1);
+                if (filaSeleccionada === index) {
+                    filaSeleccionada = null;
+                } else if (filaSeleccionada > index) {
+                    filaSeleccionada--;
+                }
+                renderizarTabla();
+                mostrarToast('Registro eliminado');
+            }
+        }
+
+        function renderizarTabla() {
+            const tbody = document.getElementById('tbody');
+            const emptyState = document.getElementById('emptyState');
+
+            if (registros.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            tbody.innerHTML = registros.map((reg, index) => `
+                <tr class="${filaSeleccionada === index ? 'selected-row' : ''}" onclick="seleccionarFila(${index})">
+                    <td>${reg.nombre}</td>
+                    <td>${reg.horarioCitato || '-'}</td>
+                    <td>${reg.horarioLlegada || '-'}</td>
+                    <td>${reg.horarioSalida || '-'}</td>
+                    <td>
+                        <button onclick="event.stopPropagation(); eliminarRegistro(${index})" 
+                                style="background:#e74c3c;color:white;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;">
+                            Eliminar
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function descargarExcel() {
+            if (registros.length === 0) {
+                mostrarToast('No hay datos para descargar', 'error');
+                return;
+            }
+
+            const fecha = new Date().toLocaleDateString('es-ES', { timeZone: 'America/Argentina/Buenos_Aires' }).replace(/\//g, '-');
+            const datos = [
+                ['Registro de Horarios - ' + new Date().toLocaleDateString('es-ES', { timeZone: 'America/Argentina/Buenos_Aires' })],
+                [],
+                ['Nombre', 'Horario Citado', 'Horario Llegada', 'Horario Salida'],
+                ...registros.map(r => [r.nombre, r.horarioCitato, r.horarioLlegada, r.horarioSalida])
+            ];
+
+            const ws = XLSX.utils.aoa_to_sheet(datos);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Registro');
+
+            ws['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
+
+            XLSX.writeFile(wb, `Registro_Horarios_${fecha}.xlsx`);
+            mostrarToast('Excel descargado correctamente');
+        }
+
+        document.getElementById('nombreInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') agregarPersona();
+        });
+
+        mostrarFecha();
+        generarOpcionesHorario();
+    </script>
+</body>
+</html>
