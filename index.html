@@ -255,7 +255,10 @@
         <div class="controls">
             <div class="input-row">
                 <div class="input-group">
-                    <input type="text" id="nombreInput" placeholder="Nombre de la persona">
+                    <input type="text" id="nombreInput" placeholder="Nombre">
+                </div>
+                <div class="input-group">
+                    <input type="text" id="apellidoInput" placeholder="Apellido">
                 </div>
                 <div class="input-group">
                     <select id="horarioCitadoSelect">
@@ -277,6 +280,7 @@
                 <thead>
                     <tr>
                         <th>Nombre</th>
+                        <th>Apellido</th>
                         <th>Horario Citado</th>
                         <th>Horario Llegada</th>
                         <th>Horario Salida</th>
@@ -327,6 +331,17 @@
         let filaSeleccionada = null;
         let indexAEliminar = null;
 
+        function guardarDatos() {
+            localStorage.setItem('registrosHorarios', JSON.stringify(registros));
+        }
+
+        function cargarDatos() {
+            const datos = localStorage.getItem('registrosHorarios');
+            if (datos) {
+                registros = JSON.parse(datos);
+            }
+        }
+
         function mostrarFecha() {
             const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' };
             document.getElementById('fechaActual').textContent = new Date().toLocaleDateString('es-ES', opciones);
@@ -361,13 +376,21 @@
 
         function agregarPersona() {
             const nombreInput = document.getElementById('nombreInput');
+            const apellidoInput = document.getElementById('apellidoInput');
             const horarioSelect = document.getElementById('horarioCitadoSelect');
             const nombre = nombreInput.value.trim();
+            const apellido = apellidoInput.value.trim();
             const horarioCitato = horarioSelect.value;
             
             if (!nombre) {
                 mostrarToast('Ingresa un nombre', 'error');
                 nombreInput.focus();
+                return;
+            }
+
+            if (!apellido) {
+                mostrarToast('Ingresa un apellido', 'error');
+                apellidoInput.focus();
                 return;
             }
 
@@ -380,6 +403,7 @@
             const nuevoRegistro = {
                 id: Date.now(),
                 nombre: nombre,
+                apellido: apellido,
                 horarioCitato: horarioCitato,
                 horarioLlegada: '',
                 horarioSalida: ''
@@ -387,9 +411,10 @@
 
             registros.push(nuevoRegistro);
             nombreInput.value = '';
+            apellidoInput.value = '';
             horarioSelect.value = '';
             renderizarTabla();
-            mostrarToast(`${nombre} agregado correctamente`);
+            mostrarToast(`${nombre} ${apellido} agregado correctamente`);
         }
 
         function registrarLlegada() {
@@ -444,6 +469,7 @@
         }
 
         function renderizarTabla() {
+            guardarDatos();
             const tbody = document.getElementById('tbody');
             const emptyState = document.getElementById('emptyState');
 
@@ -457,6 +483,7 @@
             tbody.innerHTML = registros.map((reg, index) => `
                 <tr class="${filaSeleccionada === index ? 'selected-row' : ''}" onclick="seleccionarFila(${index})">
                     <td>${reg.nombre}</td>
+                    <td>${reg.apellido}</td>
                     <td>${reg.horarioCitato || '-'}</td>
                     <td>${reg.horarioLlegada || '-'}</td>
                     <td>${reg.horarioSalida || '-'}</td>
@@ -480,26 +507,32 @@
             const datos = [
                 ['Registro de Horarios - ' + new Date().toLocaleDateString('es-ES', { timeZone: 'America/Argentina/Buenos_Aires' })],
                 [],
-                ['Nombre', 'Horario Citado', 'Horario Llegada', 'Horario Salida'],
-                ...registros.map(r => [r.nombre, r.horarioCitato, r.horarioLlegada, r.horarioSalida])
+                ['Nombre', 'Apellido', 'Horario Citado', 'Horario Llegada', 'Horario Salida'],
+                ...registros.map(r => [r.nombre, r.apellido, r.horarioCitato, r.horarioLlegada, r.horarioSalida])
             ];
 
             const ws = XLSX.utils.aoa_to_sheet(datos);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Registro');
 
-            ws['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
+            ws['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
 
             XLSX.writeFile(wb, `Registro_Horarios_${fecha}.xlsx`);
             mostrarToast('Excel descargado correctamente');
         }
 
         document.getElementById('nombreInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') document.getElementById('apellidoInput').focus();
+        });
+
+        document.getElementById('apellidoInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') agregarPersona();
         });
 
+        cargarDatos();
         mostrarFecha();
         generarOpcionesHorario();
+        renderizarTabla();
     </script>
 </body>
 </html>
